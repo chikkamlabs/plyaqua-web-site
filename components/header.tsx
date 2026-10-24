@@ -57,14 +57,14 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full bg-deep-navy/95 backdrop-blur-md border-b border-pure-white/10 transition-all duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
+        <div className="flex items-center justify-between h-20 sm:h-20">
           
           {/* Left: PlyAqua Logo + Text */}
           <div
             onClick={() => handleScrollTo('hero')}
             className="flex items-center gap-2.5 sm:gap-3 select-none cursor-pointer"
           >
-            <div className="relative w-10 h-10 sm:w-13 sm:h-13 shrink-0 rounded-full overflow-hidden border border-pure-white/20 bg-pure-white/10 shadow-xs">
+            <div className="relative w-12 h-12 sm:w-[52px] sm:h-[52px] shrink-0 rounded-lg overflow-hidden border border-pure-white/20 bg-pure-white/10 shadow-xs">
               <Image
                 src="/plyaqua_logo.png"
                 alt="PlyAqua Logo"
