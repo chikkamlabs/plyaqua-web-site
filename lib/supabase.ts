@@ -9,6 +9,7 @@ export type BillStatus = 'pending' | 'delivered' | 'accepted';
 export type TransactionType = 'add' | 'sub';
 export type PaymentMethod = 'cash' | 'upi' | 'card' | 'other' | 'bill';
 export type PointsTransType = 'add' | 'delete';
+export type CuspntreqStatus = 'pending' | 'processing' | 'completed' | 'rejected' | 'cancelled';
 
 // ============================================================================
 // Table Row Types (mirrored from lib/schemas.sql)
@@ -206,7 +207,7 @@ export interface PartnerInventoryRow {
 
 export interface CustomerPointRow {
   id: string;
-  type: string;
+  type: PointsTransType;
   points: number;
   customer_id: string;
   notes: string | null;
@@ -220,7 +221,7 @@ export interface CustomerPointsReqRow {
   customer_id: string;
   points: number;
   notes: string | null;
-  status: string;
+  status: CuspntreqStatus;
   created_at: string;
   updated_at: string;
 }
