@@ -70,7 +70,7 @@ export default function Header() {
                 alt="PlyAqua Logo"
                 fill
                 sizes="52px"
-                className="object-contain p-1"
+                className="object-contain p-0"
                 priority
                 referrerPolicy="no-referrer"
               />
@@ -168,14 +168,6 @@ export default function Header() {
               )}
             </div>
 
-            {/* 6. Footer */}
-            <button
-              type="button"
-              onClick={() => handleScrollTo('footer')}
-              className="text-xs sm:text-sm font-semibold text-pure-white/90 hover:text-aqua-teal cursor-pointer transition-colors duration-150 py-1"
-            >
-              Footer
-            </button>
           </nav>
 
           {/* Right: Profile, Game Play CTA & Mobile Controls */}
@@ -312,14 +304,6 @@ export default function Header() {
                 )}
               </div>
 
-              {/* 6. Footer */}
-              <button
-                type="button"
-                onClick={() => handleScrollTo('footer')}
-                className="px-3 py-2 text-left text-sm font-semibold text-pure-white/90 hover:bg-pure-white/10 hover:text-aqua-teal rounded-lg transition-colors cursor-pointer"
-              >
-                Footer
-              </button>
             </div>
           </div>
         )}

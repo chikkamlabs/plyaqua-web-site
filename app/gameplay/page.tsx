@@ -105,6 +105,8 @@ export default function GameplayPage() {
   const [isVideoMuted, setIsVideoMuted] = useState<boolean>(true);
   const [videoProgress, setVideoProgress] = useState<number>(0);
 
+  const [canSkipGuess, setCanSkipGuess] = useState(false);
+
   const wheelSectionRef = useRef<HTMLElement | null>(null);
   const challengeSectionRef = useRef<HTMLElement | null>(null);
   const nativeInputRef = useRef<HTMLInputElement | null>(null);
@@ -360,6 +362,8 @@ export default function GameplayPage() {
     setSpinWonCash(null);
     setGameStage('IDLE');
     setPuzzle(null);
+    setCanSkipGuess(false);
+setVideoProgress(0);
 
     const isCash = rewardMode === 'cash';
     const activeSlotList = isCash ? cashSlots : slots;
@@ -431,6 +435,7 @@ export default function GameplayPage() {
     if (videoRef.current) {
       videoRef.current.pause();
     }
+    setCanSkipGuess(true);
   };
 
   // Word Game Completion Trigger
@@ -1186,6 +1191,24 @@ export default function GameplayPage() {
                 </div>
               </div>
             </div>
+                  
+                    {canSkipGuess && gameStage === 'CHALLENGE_ACTIVE' && (
+  <div className="flex justify-center pt-3">
+    <button
+      type="button"
+      onClick={() => {
+        setWrongChancesLeft(0);
+        handleFinishWordPuzzle(false);
+      }}
+      className="px-5 py-2.5 rounded-xl border-2 border-vibrant-coral
+        text-vibrant-coral bg-white hover:bg-vibrant-coral
+        hover:text-white font-bold text-sm transition-all
+        active:scale-95"
+    >
+      Can't Guess? Skip Challenge
+    </button>
+  </div>
+)}
 
             {/* Word Puzzle Game Interface */}
             {puzzle && (
@@ -1286,7 +1309,7 @@ export default function GameplayPage() {
                       <h3 className="text-sm sm:text-base font-black text-deep-navy leading-tight">
                         {wordGuessedCorrectly
                           ? '🎉 Word Guessed Correctly!'
-                          : 'Word Completed!'}
+                          : 'Better luck next time!'}
                       </h3>
                       <p className="text-[11px] sm:text-xs text-deep-navy/70 mt-0.5">
                         The secret word was <span className="font-black text-deep-navy underline decoration-aqua-teal">{puzzle.word}</span>.
