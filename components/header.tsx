@@ -57,20 +57,20 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full bg-deep-navy/95 backdrop-blur-md border-b border-pure-white/10 transition-all duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20 sm:h-20">
+        <div className="flex items-center justify-between h-16 sm:h-20">
           
           {/* Left: PlyAqua Logo + Text */}
           <div
             onClick={() => handleScrollTo('hero')}
             className="flex items-center gap-2.5 sm:gap-3 select-none cursor-pointer"
           >
-            <div className="relative w-12 h-12 sm:w-[52px] sm:h-[52px] shrink-0 rounded-lg overflow-hidden border border-pure-white/20 bg-pure-white/10 shadow-xs">
+            <div className="relative w-10 h-10 sm:w-13 sm:h-13 shrink-0 rounded-full overflow-hidden border border-pure-white/20 bg-pure-white/10 shadow-xs">
               <Image
                 src="/plyaqua_logo.png"
                 alt="PlyAqua Logo"
                 fill
                 sizes="52px"
-                className="object-contain p-1"
+                className="object-contain p-0"
                 priority
                 referrerPolicy="no-referrer"
               />
@@ -168,18 +168,21 @@ export default function Header() {
               )}
             </div>
 
-            {/* 6. Footer */}
-            <button
-              type="button"
-              onClick={() => handleScrollTo('footer')}
-              className="text-xs sm:text-sm font-semibold text-pure-white/90 hover:text-aqua-teal cursor-pointer transition-colors duration-150 py-1"
-            >
-              Footer
-            </button>
           </nav>
 
-          {/* Right: Game Play CTA & Mobile Controls */}
+          {/* Right: Profile, Game Play CTA & Mobile Controls */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Profile Link (Beside Left to Game Play) */}
+            <Link
+              href="/profile"
+              className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-full border border-aqua-teal text-pure-white font-bold text-xs sm:text-sm hover:bg-aqua-teal/20 hover:border-pure-white active:scale-95 cursor-pointer transition-all duration-200"
+              title="Customer Profile"
+            >
+              <User className="w-4 h-4 text-aqua-teal" />
+              <span className="hidden sm:inline">Profile</span>
+            </Link>
+
+            {/* Game Play CTA */}
             <Link
               href="/gameplay"
               className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-aqua-teal text-pure-white font-bold text-xs sm:text-sm shadow-sm hover:bg-pure-white hover:text-deep-navy active:scale-95 cursor-pointer transition-all duration-200"
@@ -210,6 +213,15 @@ export default function Header() {
         {mobileMenuOpen && (
           <div className="lg:hidden py-3 border-t border-pure-white/10 bg-deep-navy text-pure-white animate-in slide-in-from-top-2 duration-150">
             <div className="flex flex-col gap-1">
+              <Link
+                href="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 text-left text-sm font-bold text-pure-white bg-pure-white/5 border border-aqua-teal/40 rounded-lg transition-colors mb-1"
+              >
+                <User className="w-4 h-4 text-aqua-teal" />
+                <span>My Profile</span>
+              </Link>
+
               <Link
                 href="/gameplay"
                 onClick={() => setMobileMenuOpen(false)}
@@ -292,14 +304,6 @@ export default function Header() {
                 )}
               </div>
 
-              {/* 6. Footer */}
-              <button
-                type="button"
-                onClick={() => handleScrollTo('footer')}
-                className="px-3 py-2 text-left text-sm font-semibold text-pure-white/90 hover:bg-pure-white/10 hover:text-aqua-teal rounded-lg transition-colors cursor-pointer"
-              >
-                Footer
-              </button>
             </div>
           </div>
         )}
