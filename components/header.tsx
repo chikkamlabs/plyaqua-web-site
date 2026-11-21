@@ -114,6 +114,15 @@ export default function Header() {
               Our Collection
             </button>
 
+            {/* 4. Subscriptions */}
+            <button
+              type="button"
+              onClick={() => handleScrollTo('subscription-plans')}
+              className="text-xs sm:text-sm font-semibold text-pure-white/90 hover:text-aqua-teal cursor-pointer transition-colors duration-150 py-1"
+            >
+              Subscriptions
+            </button>
+
             {/* 4. Why choose us */}
             <button
               type="button"
@@ -258,6 +267,15 @@ export default function Header() {
                 Our Collection
               </button>
 
+              {/* 4. Subscriptions */}
+              <button
+                type="button"
+                onClick={() => handleScrollTo('subscription-plans')}
+                className="px-3 py-2 text-left text-sm font-semibold text-pure-white/90 hover:bg-pure-white/10 hover:text-aqua-teal rounded-lg transition-colors cursor-pointer"
+              >
+                Subscriptions
+              </button>
+
               {/* 4. Why choose us */}
               <button
                 type="button"
@@ -304,6 +322,14 @@ export default function Header() {
                 )}
               </div>
 
+              {/* 6. Footer */}
+              <button
+                type="button"
+                onClick={() => handleScrollTo('footer')}
+                className="px-3 py-2 text-left text-sm font-semibold text-pure-white/90 hover:bg-pure-white/10 hover:text-aqua-teal rounded-lg transition-colors cursor-pointer"
+              >
+                Footer
+              </button>
             </div>
           </div>
         )}

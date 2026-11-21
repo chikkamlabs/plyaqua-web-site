@@ -24,7 +24,9 @@ import {
   VolumeX,
   IndianRupee,
   Ticket,
+  MapPin,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   CustomerRow,
@@ -48,6 +50,11 @@ import {
   insertCustomerCashback,
   CashbackSpinSlot,
 } from '@/lib/customercashbacksStore';
+import {
+  fetchMatchingActiveCampaign,
+  incrementCampaignViews,
+  PlayableCampaign,
+} from '@/lib/campaigningStore';
 
 export default function GameplayPage() {
   // Mobile & Registration State (Strictly no local storage)
@@ -107,9 +114,112 @@ export default function GameplayPage() {
 
   const [canSkipGuess, setCanSkipGuess] = useState(false);
 
+  // Location & Campaign Ad State
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const userLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'requesting' | 'granted' | 'denied' | 'unsupported'>('requesting');
+  const [locationError, setLocationError] = useState<string>('');
+  const [activeCampaign, setActiveCampaign] = useState<PlayableCampaign | null>(null);
+  const campaignViewIncrementedRef = useRef<boolean>(false);
+
   const wheelSectionRef = useRef<HTMLElement | null>(null);
   const challengeSectionRef = useRef<HTMLElement | null>(null);
   const nativeInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Request user geolocation (manual button trigger)
+  const requestUserLocation = useCallback(() => {
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+      setLocationStatus('unsupported');
+      setLocationError('Location services are not supported by your browser.');
+      return;
+    }
+
+    setLocationStatus('requesting');
+    setLocationError('');
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coords = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+        userLocationRef.current = coords;
+        setUserLocation(coords);
+        setLocationStatus('granted');
+        setLocationError('');
+      },
+      (err) => {
+        setLocationStatus('denied');
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationError('Please allow location permission in your browser so we can match nearby campaigns.');
+        } else {
+          setLocationError('Could not fetch your current location. Please allow location permission and try again.');
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  }, []);
+
+  // Automatically ask for browser location permission and fetch coordinates when entering the page
+  useEffect(() => {
+    let mounted = true;
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+      Promise.resolve().then(() => {
+        if (mounted) {
+          setLocationStatus('unsupported');
+          setLocationError('Location services are not supported by your browser.');
+        }
+      });
+      return () => {
+        mounted = false;
+      };
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        if (!mounted) return;
+        const coords = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+        userLocationRef.current = coords;
+        setUserLocation(coords);
+        setLocationStatus('granted');
+        setLocationError('');
+      },
+      (err) => {
+        if (!mounted) return;
+        setLocationStatus('denied');
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationError('Please allow location permission in your browser so we can match nearby campaigns.');
+        } else {
+          setLocationError('Could not fetch your current location. Please allow location permission and try again.');
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Allow skipping when an image-based campaign ad is shown for 5 seconds
+  useEffect(() => {
+    if (gameStage !== 'CHALLENGE_ACTIVE' || activeCampaign?.mediaType !== 'image') return;
+    const timer = setTimeout(() => {
+      setCanSkipGuess(true);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [gameStage, activeCampaign]);
 
   // Auto-cycle hints one after one
   useEffect(() => {
@@ -292,6 +402,8 @@ export default function GameplayPage() {
     setPuzzle(null);
     setGuessedSlots([]);
     setWrongChancesLeft(MAX_WRONG_CHANCES);
+    setActiveCampaign(null);
+    campaignViewIncrementedRef.current = false;
     setErrorMessage('');
   };
 
@@ -396,10 +508,22 @@ setVideoProgress(0);
         setSpinWonPoints(selectedPt.points);
       }
 
-      triggerCongratsBlast();
+      // Fetch random word from game_words table and matching active campaign ad
+      const latestCoords = userLocationRef.current ?? userLocation;
+      const [newPuzzle, matchedCampaign] = await Promise.all([
+        fetchRandomGameWord(),
+        fetchMatchingActiveCampaign(
+          latestCoords?.latitude ?? null,
+          latestCoords?.longitude ?? null
+        ),
+      ]);
 
-      // Fetch random word from game_words table for challenge
-      const newPuzzle = await fetchRandomGameWord();
+      setActiveCampaign(matchedCampaign);
+      if (matchedCampaign && !campaignViewIncrementedRef.current) {
+        campaignViewIncrementedRef.current = true;
+        incrementCampaignViews(matchedCampaign.campaignId, matchedCampaign.views);
+      }
+
       setPuzzle(newPuzzle);
       setGuessedSlots(new Array(newPuzzle.word.length).fill(''));
       setSelectedSlotIndex(0);
@@ -545,10 +669,6 @@ setVideoProgress(0);
       const pathData = `M ${center} ${center} L ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2} Z`;
       const midAngleDeg = i * sliceAngleDeg + sliceAngleDeg / 2 - 90;
 
-      const labelText = isCash
-        ? `₹${(slot as CashbackSpinSlot).amount}`
-        : `${(slot as SpinSlot).points}`;
-
       return (
         <g key={slot.id || `slot_${i}`}>
           <path
@@ -561,30 +681,13 @@ setVideoProgress(0);
           <g transform={`rotate(${midAngleDeg}, ${center}, ${center})`}>
             {/* Emoji */}
             <text
-              x={center + radius * 0.76}
+              x={center + radius * 0.72}
               y={center + 5}
               textAnchor="middle"
               className="text-xl select-none filter drop-shadow-sm pointer-events-none"
-              transform={`rotate(90, ${center + radius * 0.76}, ${center + 5})`}
+              transform={`rotate(90, ${center + radius * 0.72}, ${center + 5})`}
             >
               {slot.emoji}
-            </text>
-
-            {/* Label (Points or Cash Amount) */}
-            <text
-              x={center + radius * 0.42}
-              y={center + 4}
-              textAnchor="middle"
-              fill={slot.textColor}
-              fontSize={isCash ? "11.5" : "12.5"}
-              fontWeight="800"
-              className="select-none tracking-tight pointer-events-none"
-              style={{
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-                textShadow: slot.textColor === '#FFFFFF' ? '0px 1px 2px rgba(0,0,0,0.45)' : 'none',
-              }}
-            >
-              {labelText}
             </text>
           </g>
         </g>
@@ -601,6 +704,34 @@ setVideoProgress(0);
 
       {/* 2. Main Page Content - Compact & Mobile Responsive */}
       <main className="flex-1 w-full max-w-xl mx-auto px-3 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8">
+
+        {/* Location Access Prompt */}
+        {locationStatus !== 'granted' && (
+          <section className="bg-soft-aqua/80 rounded-2xl border-2 border-aqua-teal/40 p-3.5 sm:p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <div className="p-2 rounded-xl bg-pure-white border border-aqua-teal/30 text-aqua-teal shrink-0">
+                <MapPin className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-xs sm:text-sm font-black text-deep-navy">
+                  Allow Location Permission
+                </h2>
+                <p className="text-[11px] sm:text-xs text-deep-navy/75 mt-0.5">
+                  {locationError || 'Please allow location access in your browser to match nearby active campaigns.'}
+                </p>
+              </div>
+            </div>
+            {locationStatus !== 'unsupported' && (
+              <button
+                type="button"
+                onClick={requestUserLocation}
+                className="shrink-0 py-2 px-3.5 rounded-xl bg-aqua-teal hover:bg-deep-navy text-pure-white font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer"
+              >
+                {locationStatus === 'requesting' ? 'Requesting...' : 'Allow Location'}
+              </button>
+            )}
+          </section>
+        )}
 
         {/* =========================================================================
             SECTION 1: ASK MOBILE NUMBER / GREETING
@@ -1051,67 +1182,10 @@ setVideoProgress(0);
             </div>
           </div>
 
-          {/* =========================================================================
-              ON-SCREEN POINTS OR CASH WON BANNER (DECREASED SIZE)
-          ========================================================================= */}
-          {((winningSlot && spinWonPoints !== null) || (winningCashSlot && spinWonCash !== null)) && !isSpinning && (
-            <div className="w-full mt-4 p-3.5 sm:p-4 rounded-xl bg-soft-aqua border-2 border-aqua-teal animate-in zoom-in-95 duration-300">
-              <div className="flex items-center justify-center gap-2.5">
-                <span className="text-2xl animate-bounce">
-                  {rewardMode === 'cash' ? winningCashSlot?.emoji : winningSlot?.emoji}
-                </span>
-                <div className="text-left">
-                  <div className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-aqua-teal text-pure-white text-[9px] font-black tracking-widest uppercase">
-                    {rewardMode === 'cash' ? 'CASHBACK WINNER' : 'SPIN WINNER'}
-                  </div>
-                  <h3 className="text-sm sm:text-base font-black text-deep-navy leading-tight mt-0.5">
-                    {rewardMode === 'cash' ? (
-                      <>You won <span className="text-aqua-teal">₹{spinWonCash} Cashback</span>!</>
-                    ) : (
-                      <>You won <span className="text-aqua-teal">+{spinWonPoints} Points</span>!</>
-                    )}
-                  </h3>
-                  <p className="text-[11px] font-medium text-deep-navy/75 mt-0.5">
-                    {rewardMode === 'cash'
-                      ? 'Watch the video and guess the word below to claim your cashback to UPI!'
-                      : 'Watch the video and guess the word below to claim your points!'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-2.5 pt-2 border-t border-pale-blue-gray flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    challengeSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="inline-flex items-center gap-1.5 text-xs font-black text-deep-navy hover:text-aqua-teal transition-colors uppercase tracking-wider"
-                >
-                  <span>Go to Word Challenge</span>
-                  <ArrowDownCircle className="w-3.5 h-3.5 text-aqua-teal animate-bounce" />
-                </button>
-              </div>
-            </div>
-          )}
         </section>
 
         {/* =========================================================================
-            SECTION 3: BELOW SPIN WHEEL: VIDEO & WORD GUESSING CHALLENGE
-            RULE: "and then below the spin wheel play a small 10 secs(just 200kb size video)
-            video and below write guess the word to get points. ask them a word to guess
-            (randomly select from the game_words table and display the hints(one after one)
-            for that word). If video stops. Just stop the video. and allow user to give upto
-            3 wrong chances(alphabet placement at index). After completing the word.
-            No matter they guess or no. Just show there result. then Add points to customers
-            table which they won in the spin wheel. then again do a blast and show won points
-            & total points"
-        {/* =========================================================================
-            SECTION 3: BELOW SPIN WHEEL: VIDEO & WORD GUESSING CHALLENGE
-            - Mobile responsive and compact
-            - Video ratio strictly 3:2
-            - Hints move one after one with decreased font size & padding
-            - Alphabets input only, NO numbers
-            - Small and responsive result card
+            SECTION 3: BELOW SPIN WHEEL: CAMPAIGN AD & WORD GUESSING CHALLENGE
         ========================================================================= */}
         {((winningSlot && spinWonPoints !== null) || (winningCashSlot && spinWonCash !== null)) && (
           <section
@@ -1123,76 +1197,107 @@ setVideoProgress(0);
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-soft-aqua text-aqua-teal text-[10px] sm:text-xs font-black uppercase tracking-wider">
                 <Trophy className="w-3.5 h-3.5" />
                 <span>
-                  {rewardMode === 'cash'
-                    ? `Claim Your ₹${spinWonCash} Cashback`
-                    : `Claim Your ${spinWonPoints} Points`}
+                  {gameStage === 'COMPLETED'
+                    ? rewardMode === 'cash'
+                      ? `₹${spinWonCash} Cashback Won`
+                      : `${spinWonPoints} Points Won`
+                    : 'Word Challenge'}
                 </span>
               </div>
               <h2 className="text-base sm:text-lg md:text-xl font-black text-deep-navy tracking-tight">
                 {rewardMode === 'cash' ? 'Guess the Word to Get Cashback' : 'Guess the Word to Get Points'}
               </h2>
               <p className="text-xs text-deep-navy/70 max-w-sm mx-auto">
-                Watch the video clip below and use clues to complete the word. You have up to 3 wrong chances!
+                Watch the ad below and use clues to complete the word to reveal your reward. You have up to 3 wrong chances!
               </p>
             </div>
 
-            {/* Mobile-First 3:2 Video Player */}
+            {/* Mobile-First 3:2 Campaign Ad Media Player (Video or Image) */}
             <div className="relative w-full max-w-xs sm:max-w-sm mx-auto overflow-hidden rounded-xl border-2 border-pale-blue-gray bg-deep-navy shadow-xs">
-              <video
-                ref={videoRef}
-                src="/gameplay_ad.mp4"
-                playsInline
-                muted={isVideoMuted}
-                onTimeUpdate={(e) => {
-                  const target = e.currentTarget;
-                  if (target.duration) {
-                    setVideoProgress((target.currentTime / target.duration) * 100);
-                  }
-                }}
-                onEnded={handleVideoEnded}
-                className="w-full aspect-[3/2] object-cover block"
-              />
-
-              {/* Progress Bar */}
-              <div className="w-full h-1 bg-deep-navy/80 relative">
-                <div
-                  className="h-full bg-aqua-teal transition-all duration-100"
-                  style={{ width: `${videoProgress}%` }}
-                />
-              </div>
-
-              {/* Video Controls Bar */}
-              <div className="px-2.5 py-1.5 bg-deep-navy flex items-center justify-between text-pure-white">
-                <button
-                  type="button"
-                  onClick={toggleVideoPlayback}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-soft-aqua/20 hover:bg-soft-aqua/30 text-pure-white text-[11px] font-bold transition-colors cursor-pointer"
-                  aria-label={isVideoPlaying ? 'Pause Video' : 'Play Video'}
-                >
-                  {isVideoPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 fill-current" />}
-                  <span>{isVideoPlaying ? 'Pause' : 'Play'}</span>
-                </button>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-pure-white/70">10s Ad</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (videoRef.current) {
-                        videoRef.current.muted = !isVideoMuted;
-                        setIsVideoMuted(!isVideoMuted);
+              {activeCampaign?.mediaType === 'image' ? (
+                <>
+                  <div className="relative w-full aspect-[3/2] bg-deep-navy">
+                    <Image
+                      src={activeCampaign.mediaUrl}
+                      alt={activeCampaign.adTitle || activeCampaign.title}
+                      fill
+                      sizes="(max-width: 640px) 320px, 384px"
+                      className="object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <div className="px-2.5 py-1.5 bg-deep-navy flex items-center justify-between text-pure-white">
+                    <span className="text-[11px] font-bold truncate">
+                      {activeCampaign.title}
+                    </span>
+                    <span className="text-[10px] font-mono text-pure-white/70 shrink-0">
+                      Sponsored Ad
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <video
+                    key={activeCampaign?.campaignId || 'default-ad'}
+                    ref={videoRef}
+                    src={activeCampaign?.mediaUrl || '/gameplay_ad.mp4'}
+                    autoPlay
+                    playsInline
+                    muted={isVideoMuted}
+                    onTimeUpdate={(e) => {
+                      const target = e.currentTarget;
+                      if (target.duration) {
+                        setVideoProgress((target.currentTime / target.duration) * 100);
                       }
                     }}
-                    className="p-1 rounded text-pure-white/80 hover:text-pure-white transition-colors cursor-pointer"
-                    aria-label="Toggle Mute"
-                  >
-                    {isVideoMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                  </button>
-                </div>
-              </div>
+                    onEnded={handleVideoEnded}
+                    className="w-full aspect-[3/2] object-cover block"
+                  />
+
+                  {/* Progress Bar */}
+                  <div className="w-full h-1 bg-deep-navy/80 relative">
+                    <div
+                      className="h-full bg-aqua-teal transition-all duration-100"
+                      style={{ width: `${videoProgress}%` }}
+                    />
+                  </div>
+
+                  {/* Video Controls Bar */}
+                  <div className="px-2.5 py-1.5 bg-deep-navy flex items-center justify-between text-pure-white">
+                    <button
+                      type="button"
+                      onClick={toggleVideoPlayback}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-soft-aqua/20 hover:bg-soft-aqua/30 text-pure-white text-[11px] font-bold transition-colors cursor-pointer"
+                      aria-label={isVideoPlaying ? 'Pause Video' : 'Play Video'}
+                    >
+                      {isVideoPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 fill-current" />}
+                      <span>{isVideoPlaying ? 'Pause' : 'Play'}</span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-pure-white/70 truncate max-w-[140px]">
+                        {activeCampaign?.title || '10s Ad'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (videoRef.current) {
+                            videoRef.current.muted = !isVideoMuted;
+                            setIsVideoMuted(!isVideoMuted);
+                          }
+                        }}
+                        className="p-1 rounded text-pure-white/80 hover:text-pure-white transition-colors cursor-pointer"
+                        aria-label="Toggle Mute"
+                      >
+                        {isVideoMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-                  
-                    {canSkipGuess && gameStage === 'CHALLENGE_ACTIVE' && (
+
+            {canSkipGuess && gameStage === 'CHALLENGE_ACTIVE' && (
   <div className="flex justify-center pt-3">
     <button
       type="button"
@@ -1205,7 +1310,7 @@ setVideoProgress(0);
         hover:text-white font-bold text-sm transition-all
         active:scale-95"
     >
-      Can't Guess? Skip Challenge
+      Can&apos;t Guess? Skip Challenge
     </button>
   </div>
 )}
@@ -1309,7 +1414,7 @@ setVideoProgress(0);
                       <h3 className="text-sm sm:text-base font-black text-deep-navy leading-tight">
                         {wordGuessedCorrectly
                           ? '🎉 Word Guessed Correctly!'
-                          : 'Better luck next time!'}
+                          : 'Word Completed!'}
                       </h3>
                       <p className="text-[11px] sm:text-xs text-deep-navy/70 mt-0.5">
                         The secret word was <span className="font-black text-deep-navy underline decoration-aqua-teal">{puzzle.word}</span>.
@@ -1425,6 +1530,17 @@ setVideoProgress(0);
                           <span>New Session</span>
                         </button>
                       </div>
+                      {customer.key && (
+                        <div className="bg-pure-white px-3 py-2 rounded-lg border border-pale-blue-gray flex items-center justify-between">
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-deep-navy/70">
+                            <KeyRound className="w-3.5 h-3.5 text-aqua-teal" />
+                            <span>Profile Key</span>
+                          </span>
+                          <span className="text-xs sm:text-sm font-mono font-black text-deep-navy tracking-wider">
+                            {customer.key}
+                          </span>
+                        </div>
+                      )}
                       <p className="text-[10px] text-deep-navy/60 font-medium text-center">
                         ✓ 1 spin allowed per session. Start a new session or check your profile.
                       </p>

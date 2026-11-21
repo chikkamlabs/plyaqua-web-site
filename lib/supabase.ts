@@ -44,6 +44,7 @@ export interface AdContentRow {
   id: string;
   title: string;
   media_url: string | null;
+  media_type?: 'image' | 'video';
   status: ActiveStatus;
   created_at: string;
   updated_at: string;
@@ -134,6 +135,26 @@ export interface CampaignRow {
   description: string | null;
   content_id: string | null;
   views: number;
+  latitude: number | null;
+  longitude: number | null;
+  radius_mtrs: number | null;
+  location_enabled: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  max_views: number | null;
+  location_name: string | null;
+  status: ActiveStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubscriptionPlanRow {
+  id: string;
+  name: string;
+  actual_price: number;
+  selling_price: number;
+  includes: string[] | unknown;
+  image_url: string | null;
   status: ActiveStatus;
   created_at: string;
   updated_at: string;
@@ -277,6 +298,7 @@ export interface Database {
       customer_points_reqs: { Row: CustomerPointsReqRow; Insert: Partial<CustomerPointsReqRow> & { customer_id: string; points: number }; Update: Partial<CustomerPointsReqRow> };
       customer_cashback: { Row: CustomerCashbackRow; Insert: Partial<CustomerCashbackRow> & { customer_id: string; cashback_amnt: number }; Update: Partial<CustomerCashbackRow> };
       customer_plays: { Row: CustomerPlayRow; Insert: Partial<CustomerPlayRow> & { customer_id: string }; Update: Partial<CustomerPlayRow> };
+      subscription_plans: { Row: SubscriptionPlanRow; Insert: Partial<SubscriptionPlanRow> & { name: string }; Update: Partial<SubscriptionPlanRow> };
     };
   };
 }
