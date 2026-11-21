@@ -2,6 +2,7 @@ import Header from '@/components/header';
 import HeroSection from '@/components/heroSection';
 import PartnerCategoriesSection from '@/components/partnerCategoriesSection';
 import OurCollectionSection from '@/components/ourCollectionSection';
+import SubscriptionPlansSection from '@/components/subscripitonplans';
 import WhyChooseUs from '@/components/Whychooseus';
 import ContactUs from '@/components/contactus';
 import Footer from '@/components/footer';
@@ -14,6 +15,7 @@ export default function Home() {
         <HeroSection />
         <PartnerCategoriesSection />
         <OurCollectionSection />
+        <SubscriptionPlansSection />
         <WhyChooseUs />
         <ContactUs />
       </div>

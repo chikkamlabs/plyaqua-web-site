@@ -56,7 +56,7 @@ export default function ProfilePage() {
     }
 
     if (!cleanKey) {
-      setErrorMsg('Please enter your 6-digit key.');
+      setErrorMsg('Please enter your key.');
       return;
     }
 
@@ -136,7 +136,7 @@ export default function ProfilePage() {
               Customer Profile
             </h1>
             <p className="text-sm text-deep-navy/70 mt-2 mb-6">
-              Enter your registered mobile number and 6-digit key to view your points, transaction history, and submit point redemptions.
+              Enter your registered mobile number and key to view your points, transaction history, and submit point redemptions.
             </p>
 
             <form onSubmit={handleVerify} className="space-y-4">
@@ -162,10 +162,10 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* 6-Digit Key Input */}
+              {/* Key Input */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-deep-navy mb-1.5">
-                  6-Digit Key
+                  Key
                 </label>
                 <div className="relative flex items-center">
                   <span className="absolute left-4 text-base font-mono font-bold text-deep-navy/50">#</span>
@@ -174,10 +174,30 @@ export default function ProfilePage() {
                     maxLength={10}
                     value={key}
                     onChange={(e) => setKey(e.target.value.trim())}
-                    placeholder="e.g. 671234"
+                    placeholder="Enter your key"
                     className="w-full pl-10 pr-4 py-3 bg-pure-white border-2 border-pale-blue-gray rounded-xl text-deep-navy placeholder:text-deep-navy/40 focus:border-aqua-teal focus:outline-none focus:ring-2 focus:ring-aqua-teal/20 text-base font-mono font-semibold tracking-wider transition-all"
                     required
                   />
+                </div>
+                <div className="mt-1.5 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cleanMobile = mobile.trim().replace(/\D/g, '');
+                      const lines = [
+                        `*PlyAqua Forgot Key Request*`,
+                        ...(cleanMobile ? [`*Mobile:* +91 ${cleanMobile}`] : []),
+                        `Please tell my key.`,
+                      ];
+                      const whatsappUrl = `https://wa.me/919989063822?text=${encodeURIComponent(lines.join('\n'))}`;
+                      if (typeof window !== 'undefined') {
+                        window.location.href = whatsappUrl;
+                      }
+                    }}
+                    className="text-xs font-semibold text-aqua-teal hover:text-deep-navy hover:underline transition-colors cursor-pointer"
+                  >
+                    Forgot key?
+                  </button>
                 </div>
               </div>
 
