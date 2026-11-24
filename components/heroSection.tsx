@@ -15,10 +15,13 @@ import {
   RotateCcw,
 } from 'lucide-react';
 
+const HERO_INTRO_STORAGE_KEY = 'plyaqua_hero_intro_played';
+let hasPlayedHeroIntroInMemory = false;
+
 export default function HeroSection() {
-  // Intro Bottle Animation Stages: 'entering' -> 'opening' -> 'closing' -> 'done'
-  const [introStage, setIntroStage] = useState<'entering' | 'opening' | 'closing' | 'done'>('entering');
-  const [contentVisible, setContentVisible] = useState(false);
+  // Intro Bottle Animation Stages: 'idle' | 'entering' -> 'opening' -> 'closing' -> 'done'
+  const [introStage, setIntroStage] = useState<'idle' | 'entering' | 'opening' | 'closing' | 'done'>('idle');
+  const [contentVisible, setContentVisible] = useState(true);
 
   // Marquee interactions
   const [isHovered, setIsHovered] = useState(false);
@@ -39,28 +42,63 @@ export default function HeroSection() {
     return () => clearInterval(wordTimer);
   }, [funWords.length]);
 
-  // Sequence the initial water bottle intro animation
+  // Play the initial water bottle intro animation only once per session
   useEffect(() => {
-    // 0.0s - 0.9s: Bottle enters and moves to center
-    const timerOpen = setTimeout(() => {
-      setIntroStage('opening'); // Cap opens with animation
-    }, 900);
+    let timerOpen: ReturnType<typeof setTimeout> | undefined;
+    let timerClose: ReturnType<typeof setTimeout> | undefined;
+    let timerDone: ReturnType<typeof setTimeout> | undefined;
 
-    // 0.9s - 2.1s: Cap is open, mist droplets emit
-    const timerClose = setTimeout(() => {
-      setIntroStage('closing'); // Cap closes back down
-    }, 2100);
+    const timerStart = setTimeout(() => {
+      let alreadyPlayed = hasPlayedHeroIntroInMemory;
+      if (!alreadyPlayed && typeof window !== 'undefined') {
+        try {
+          alreadyPlayed = window.sessionStorage.getItem(HERO_INTRO_STORAGE_KEY) === 'true';
+        } catch {
+          // ignore storage errors
+        }
+      }
 
-    // 2.1s - 2.8s: Intro finishes and main hero content transitions in
-    const timerDone = setTimeout(() => {
-      setIntroStage('done');
-      setContentVisible(true);
-    }, 2800);
+      if (alreadyPlayed) {
+        hasPlayedHeroIntroInMemory = true;
+        setIntroStage('done');
+        setContentVisible(true);
+        return;
+      }
+
+      hasPlayedHeroIntroInMemory = true;
+      if (typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.setItem(HERO_INTRO_STORAGE_KEY, 'true');
+        } catch {
+          // ignore storage errors
+        }
+      }
+
+      setContentVisible(false);
+      setIntroStage('entering');
+
+      // 0.0s - 0.9s: Bottle enters and moves to center
+      timerOpen = setTimeout(() => {
+        setIntroStage('opening'); // Cap opens with animation
+      }, 900);
+
+      // 0.9s - 2.1s: Cap is open, mist droplets emit
+      timerClose = setTimeout(() => {
+        setIntroStage('closing'); // Cap closes back down
+      }, 2100);
+
+      // 2.1s - 2.8s: Intro finishes and main hero content transitions in
+      timerDone = setTimeout(() => {
+        setIntroStage('done');
+        setContentVisible(true);
+      }, 2800);
+    }, 0);
 
     return () => {
-      clearTimeout(timerOpen);
-      clearTimeout(timerClose);
-      clearTimeout(timerDone);
+      clearTimeout(timerStart);
+      if (timerOpen) clearTimeout(timerOpen);
+      if (timerClose) clearTimeout(timerClose);
+      if (timerDone) clearTimeout(timerDone);
     };
   }, []);
 
@@ -144,7 +182,7 @@ export default function HeroSection() {
           - Real label (/label1.png)
       ========================================================================= */}
       <AnimatePresence>
-        {introStage !== 'done' && (
+        {(introStage === 'entering' || introStage === 'opening' || introStage === 'closing') && (
           <motion.div
             key="bottle-intro-overlay"
             initial={{ opacity: 0 }}
@@ -313,7 +351,7 @@ export default function HeroSection() {
           HERO MAIN CONTENT SECTION
       ========================================================================= */}
       <div className={`relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 sm:mb-12 md:mb-16 transition-opacity duration-700 ${
-        contentVisible || introStage === 'done' ? 'opacity-100' : 'opacity-0'
+        contentVisible || introStage === 'done' || introStage === 'idle' ? 'opacity-100' : 'opacity-0'
       }`}>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center">
           
