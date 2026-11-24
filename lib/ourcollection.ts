@@ -1,98 +1,123 @@
-/**
- * Our Collection Data & Backend Service Layer
- * Structured dummy data matching the PlyAqua collection specifications.
- * Ready for future Supabase database integration.
- */
+import { supabase, ProductRow } from './supabase';
 
 export interface CollectionItem {
   id: string;
+  prodId: string;
   productName: string;
-  photo: string;
-  description: string;
-  tag: string;
-  size?: string;
-  mrp?: number;
-  sp?: number;
+  photo: string | null;
+  description: string | null;
+  tag: string | null;
+  size: string | null;
+  mrp: number;
+  sp: number;
+  qty: number;
 }
 
-export const DUMMY_COLLECTION: CollectionItem[] = [
-  {
-    id: 'plyaqua-250ml',
-    productName: 'PlyAqua Pocket Splash',
-    photo: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=800&q=80',
-    description: 'Compact 250ml pocket bottle, perfect for high-table executive meetings, short commutes, and quick on-the-go hydration.',
-    tag: '250ml Mini',
-    size: '250ml',
-    mrp: 10,
-    sp: 8,
-  },
-  {
-    id: 'plyaqua-500ml',
-    productName: 'PlyAqua Classic Pure',
-    photo: 'https://images.unsplash.com/photo-1550572017-edd951aa8f72?auto=format&fit=crop&w=800&q=80',
-    description: 'Our signature 500ml everyday packaged drinking water bottle featuring interactive QR game codes with cashback rewards.',
-    tag: '500ml Most Popular',
-    size: '500ml',
-    mrp: 20,
-    sp: 15,
-  },
-  {
-    id: 'plyaqua-1000ml',
-    productName: 'PlyAqua Hydrate Plus',
-    photo: 'https://images.unsplash.com/photo-1556881286-fc6915169721?auto=format&fit=crop&w=800&q=80',
-    description: 'Generous 1 Litre bottle engineered for fitness enthusiasts, road trips, outdoor treks, and full-day sustained hydration.',
-    tag: '1 Litre Active',
-    size: '1000ml',
-    mrp: 30,
-    sp: 25,
-  },
-  {
-    id: 'plyaqua-wedding-edition',
-    productName: 'PlyAqua Celebration Custom',
-    photo: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80',
-    description: 'Bespoke event edition with customized client branding, metallic foil accents, and premium aesthetic for weddings & galas.',
-    tag: 'Event Special',
-    size: 'Custom 300ml',
-    mrp: 25,
-    sp: 20,
-  },
-  {
-    id: 'plyaqua-corporate-edition',
-    productName: 'PlyAqua Executive Summit',
-    photo: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=800&q=80',
-    description: 'Tailored for corporate summits, boardroom conferences, and VIP lounges with dedicated partner sponsor messaging.',
-    tag: 'Corporate Edition',
-    size: '500ml Sleek',
-    mrp: 22,
-    sp: 18,
-  },
-  {
-    id: 'plyaqua-play-edition',
-    productName: 'PlyAqua Gamers Edition',
-    photo: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
-    description: 'Special edition bottle with guaranteed instant Play Code scratch card and UPI cashback coupon on every scan.',
-    tag: 'Play & Win Edition',
-    size: '500ml Game',
-    mrp: 20,
-    sp: 15,
-  },
-];
-
 /**
- * Fetch all collection products
+ * Resolve product image_url whether it is an absolute URL or stored in `product_images` bucket.
  */
-export async function getOurCollection(): Promise<CollectionItem[]> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(DUMMY_COLLECTION);
-    }, 50);
-  });
+function resolveProductImageUrl(imageUrl: string | null): string | null {
+  if (!imageUrl || !imageUrl.trim()) return null;
+  const trimmed = imageUrl.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('/')) {
+    return trimmed;
+  }
+  const { data } = supabase.storage.from('product_images').getPublicUrl(trimmed);
+  return data?.publicUrl || null;
+}
+
+function mapProductRow(
+  row: ProductRow & { sizes?: { value?: string | null } | null }
+): CollectionItem {
+  return {
+    id: row.id,
+    prodId: row.prod_id,
+    productName: row.name,
+    photo: resolveProductImageUrl(row.image_url),
+    description: row.description || null,
+    tag: row.tag || null,
+    size: row.sizes?.value || null,
+    mrp: Number(row.mrp || 0),
+    sp: Number(row.sp || 0),
+    qty: Number(row.qty || 0),
+  };
 }
 
 /**
- * Fetch single product by ID
+ * Fetch active products from Supabase `products` table (with optional limit).
+ */
+export async function getOurCollection(limit?: number): Promise<CollectionItem[]> {
+  try {
+    let query = (supabase.from('products') as any)
+      .select('*, sizes(value)')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    if (limit && limit > 0) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
+
+    if (!error && Array.isArray(data)) {
+      return (data as (ProductRow & { sizes?: { value?: string | null } | null })[]).map(
+        mapProductRow
+      );
+    }
+
+    // Fallback without sizes join if sizes relation is restricted
+    let fallbackQuery = (supabase.from('products') as any)
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false });
+
+    if (limit && limit > 0) {
+      fallbackQuery = fallbackQuery.limit(limit);
+    }
+
+    const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+    if (fallbackError || !Array.isArray(fallbackData)) {
+      if (fallbackError) {
+        console.warn('Error fetching products from Supabase:', fallbackError.message);
+      }
+      return [];
+    }
+
+    return (fallbackData as ProductRow[]).map((row) => mapProductRow(row));
+  } catch (err) {
+    console.warn('Exception fetching products from Supabase:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetch single active product by ID from Supabase `products` table.
  */
 export async function getCollectionItemById(id: string): Promise<CollectionItem | null> {
-  const item = DUMMY_COLLECTION.find((prod) => prod.id === id);
-  return item || null;
+  try {
+    const { data, error } = await (supabase.from('products') as any)
+      .select('*, sizes(value)')
+      .eq('id', id)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (!error && data) {
+      return mapProductRow(data as ProductRow & { sizes?: { value?: string | null } | null });
+    }
+
+    const { data: fallbackData, error: fallbackError } = await (supabase.from('products') as any)
+      .select('*')
+      .eq('id', id)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (fallbackError || !fallbackData) {
+      return null;
+    }
+
+    return mapProductRow(fallbackData as ProductRow);
+  } catch (err) {
+    console.warn('Exception fetching product by id:', err);
+    return null;
+  }
 }

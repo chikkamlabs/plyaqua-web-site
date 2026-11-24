@@ -28,6 +28,10 @@ export interface PartnerCategoryRow {
   id: string;
   p_cat_id: string | null;
   name: string;
+  image_url: string | null;
+  descripiton: string | null;
+  points: string[] | unknown;
+  badge: string | null;
   status: ActiveStatus;
   created_at: string;
   updated_at: string;
@@ -124,6 +128,9 @@ export interface ProductRow {
   mrp: number;
   sp: number;
   qty: number;
+  image_url: string | null;
+  description: string | null;
+  tag: string | null;
   status: ActiveStatus;
   created_at: string;
   updated_at: string;

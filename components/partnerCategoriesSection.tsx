@@ -8,14 +8,27 @@ import { getPartnerCategories, PartnerCategoryItem } from '@/lib/partnerCategori
 
 export default function PartnerCategoriesSection() {
   const [categories, setCategories] = useState<PartnerCategoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    let mounted = true;
     async function loadData() {
-      const data = await getPartnerCategories();
-      setCategories(data);
+      try {
+        const data = await getPartnerCategories();
+        if (mounted) {
+          setCategories(data);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
     }
     loadData();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const toggleMobileFlip = (id: string) => {
@@ -58,8 +71,28 @@ export default function PartnerCategoriesSection() {
           </p>
         </motion.div>
 
-        {/* Scroll Transition Cards Grid: Decreased Card Size, Vertical Only */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-6 max-w-5xl mx-auto">
+        {/* Scroll Transition Cards Grid */}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-7 max-w-6xl mx-auto">
+            {[0, 1, 2].map((idx) => (
+              <div
+                key={idx}
+                className="h-[375px] sm:h-[395px] md:h-[410px] w-full max-w-[370px] sm:max-w-none mx-auto rounded-2xl bg-soft-aqua/60 border-2 border-pale-blue-gray animate-pulse"
+              />
+            ))}
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="max-w-md mx-auto text-center rounded-2xl bg-soft-aqua/40 border-2 border-pale-blue-gray p-8">
+            <Layers className="w-10 h-10 text-aqua-teal mx-auto mb-2" />
+            <p className="text-sm sm:text-base font-bold text-deep-navy">
+              Partner categories coming soon
+            </p>
+            <p className="text-xs text-deep-navy/70 mt-1">
+              Active partner categories will appear here shortly.
+            </p>
+          </div>
+        ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-7 max-w-6xl mx-auto">
           {categories.map((category, index) => {
             const isFlippedOnMobile = !!flippedCards[category.id];
 
@@ -74,7 +107,7 @@ export default function PartnerCategoriesSection() {
                   delay: index * 0.08,
                   ease: 'easeOut',
                 }}
-                className="group [perspective:1200px] h-[340px] sm:h-[360px] md:h-[370px] w-full max-w-[340px] sm:max-w-none mx-auto cursor-pointer"
+                className="group [perspective:1200px] h-[375px] sm:h-[395px] md:h-[410px] w-full max-w-[370px] sm:max-w-none mx-auto cursor-pointer"
                 onClick={() => toggleMobileFlip(category.id)}
               >
                 {/* 3D Flippable Inner Card Container */}
@@ -90,14 +123,20 @@ export default function PartnerCategoriesSection() {
                     
                     {/* Vertical Image filling the entire card interior (leaving border) */}
                     <div className="relative w-full h-full rounded-xl overflow-hidden bg-deep-navy flex flex-col justify-between">
-                      <Image
-                        src={category.photo}
-                        alt={category.categoryName}
-                        fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        className="object-cover md:group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
-                      />
+                      {category.photo ? (
+                        <Image
+                          src={category.photo}
+                          alt={category.categoryName}
+                          fill
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          className="object-cover md:group-hover:scale-105 transition-transform duration-500"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-deep-navy via-deep-navy to-aqua-teal/30">
+                          <Layers className="w-16 h-16 text-aqua-teal/50" />
+                        </div>
+                      )}
 
                       {/* Deep-Navy Vignette & Gradient Over Image for Crisp Content Legibility */}
                       <div className="absolute inset-0 bg-gradient-to-t from-deep-navy/95 via-deep-navy/40 to-deep-navy/30" />
@@ -188,6 +227,7 @@ export default function PartnerCategoriesSection() {
             );
           })}
         </div>
+        )}
 
       </div>
     </section>
